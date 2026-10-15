@@ -60,7 +60,7 @@ Tout tient dans **`config.js`** :
 
 ```js
 const CONFIG = {
-  API_BASE_URL: 'https://mobiletest-j0c6.onrender.com',
+  API_BASE_URL: 'https://mobiletest-lw4k.onrender.com',
 };
 ```
 

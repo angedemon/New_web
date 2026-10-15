@@ -5,5 +5,5 @@
 // Le cadrage de la carte n'est plus réglable ici : elle se cale sur le contour
 // du Burkina Faso défini dans js/burkina.js.
 const CONFIG = {
-  API_BASE_URL: 'https://mobiletest-j0c6.onrender.com',
+  API_BASE_URL: 'https://mobiletest-lw4k.onrender.com',
 };
