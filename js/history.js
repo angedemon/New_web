@@ -51,8 +51,10 @@ const History = (() => {
       tbody.innerHTML = '<tr><td colspan="13" style="color:#5d6478">Aucun résultat pour ces filtres.</td></tr>';
     } else {
       tbody.innerHTML = rows.map((r) => {
-        const dl = parseFloat(r.download);
-        const lvl = qualityLevel({ download: dl }, 'debit');
+        // IMP-12 : même score global que l'app (YeleScore, js/score.js).
+        const score = YeleScore.of(r);
+        const band = YeleScore.band(score);
+        const lvl = Math.max(1, band.level);
         const date = r.timestamp ? new Date(r.timestamp).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '–';
         const net = r.networkType
           ? `<span class="net-badge" style="background:${networkColor(r.networkType)}">${escapeHtml(r.networkType)}</span>` : '–';
@@ -75,10 +77,13 @@ const History = (() => {
             <td>${browsing}</td>
             <td>${escapeHtml(r.location || r.city || '–')}</td>
             <td>${escapeHtml(r.deviceModel || '–')}</td>
-            <td><span class="q-pill" style="background:${qualityColor(lvl)}22;color:${qualityColor(lvl)}"><i style="background:${qualityColor(lvl)}"></i>${qualityLabel(lvl)}</span></td>
+            <td><span class="q-pill" style="background:${qualityColor(lvl)}22;color:${qualityColor(lvl)}"><i style="background:${qualityColor(lvl)}"></i>${Math.round(score)}/100 · ${band.label}</span></td>
           </tr>`;
       }).join('');
     }
+
+    document.getElementById('hf-updated').textContent = 'Mis à jour à '
+      + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     const pages = Math.max(1, Math.ceil(state.total / state.limit));
     document.getElementById('hp-info').textContent = `Page ${state.page} / ${pages} — ${state.total.toLocaleString('fr-FR')} tests`;
@@ -94,6 +99,26 @@ const History = (() => {
       load();
     });
     document.getElementById('hp-prev').addEventListener('click', () => { state.page--; load(); });
+
+    // IMP-11 : export des mesures correspondant aux filtres affichés.
+    const exportWith = (format) => {
+      window.location.href = API.exportUrl({
+        format,
+        operator: document.getElementById('hf-operator').value,
+        network: document.getElementById('hf-network').value,
+        from: document.getElementById('hf-from').value,
+        to: document.getElementById('hf-to').value,
+      });
+    };
+    document.getElementById('hf-export-csv').addEventListener('click', () => exportWith('csv'));
+    document.getElementById('hf-export-json').addEventListener('click', () => exportWith('json'));
+
+    // ISS-08 : la première page se rafraîchit seule chaque minute.
+    setInterval(() => {
+      const view = document.getElementById('view-history');
+      if (state.page === 1 && document.visibilityState === 'visible'
+          && view && getComputedStyle(view).display !== 'none') load();
+    }, 60_000);
     document.getElementById('hp-next').addEventListener('click', () => { state.page++; load(); });
   }
 
