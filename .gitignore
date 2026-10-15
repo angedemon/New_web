@@ -11,3 +11,4 @@ Thumbs.db
 # Journaux et fichiers temporaires
 *.log
 *.tmp
+.claude/

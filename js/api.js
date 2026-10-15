@@ -50,7 +50,8 @@ const API = (() => {
     summary: () => get('/api/dashboard/summary'),
 
     // Points géolocalisés : [{ lat, lng, operator, networkType, download, upload, ping, location, timestamp }]
-    mapPoints: () => get('/api/dashboard/map'),
+    // `fresh` contourne le cache : utilisé par l'actualisation automatique.
+    mapPoints: ({ fresh = false } = {}) => get('/api/dashboard/map', { useCache: !fresh }),
 
     // Heatmap : [{ lat, lng, intensity, download }]
     heatmap: () => get('/api/dashboard/heatmap'),
@@ -72,6 +73,16 @@ const API = (() => {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       return get(`/api/dashboard/results?${params}`, { useCache: false });
+    },
+
+    // IMP-11 : URL d'export des mesures filtrées (CSV ou JSON).
+    exportUrl: ({ format = 'csv', operator = '', network = '', from = '', to = '' } = {}) => {
+      const params = new URLSearchParams({ format });
+      if (operator) params.set('operator', operator);
+      if (network) params.set('network', network);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      return `${BASE}/api/dashboard/export?${params}`;
     },
 
     // Géocodage d'adresse (OpenStreetMap Nominatim).

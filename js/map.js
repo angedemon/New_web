@@ -4,6 +4,7 @@ const MapView = (() => {
   let map = null;
   let markersLayer = null;
   let heatLayer = null;
+  let meLayer = null; // ISS-11 : marqueur « Ma position »
   let allPoints = [];
   let countryBounds = null;
 
@@ -12,6 +13,7 @@ const MapView = (() => {
     operator: '',      // '' = tous
     tech: '',          // '' = toutes
     mode: 'points',    // points | heatmap
+    layer: 'zones',    // zones | debit | 5g (IMP-10)
     base: 'plan',      // plan | satellite
     // Période : regroupe les moyennes par heure du jour / jour de semaine / semaine.
     // value = null → aucun filtre (toutes les valeurs), mais les popups de zone
@@ -71,12 +73,47 @@ const MapView = (() => {
     baseLayers.plan.addTo(map);
     addCountryMask();
     markersLayer = L.layerGroup().addTo(map);
+    meLayer = L.layerGroup().addTo(map);
 
     // Le regroupement dépend du zoom : il faut le recalculer à chaque niveau.
     map.on('zoomend', render);
 
     bindControls();
     loadData();
+
+    // ISS-08 : actualisation automatique, sans recharger la page. Une mesure
+    // faite sur le terrain apparaît au plus une minute après son envoi.
+    setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, REFRESH_MS);
+  }
+
+  const REFRESH_MS = 60_000;
+
+  // Recharge les points sans bandeau ni remise à zéro des filtres.
+  async function refresh() {
+    try {
+      const fresh = await API.mapPoints({ fresh: true }) || [];
+      const changed = fresh.length !== allPoints.length
+        || (fresh[0] && allPoints[0] && fresh[0].timestamp !== allPoints[0].timestamp);
+      allPoints = fresh;
+      if (changed) render();
+      showUpdated();
+    } catch (_) {
+      // Serveur momentanément injoignable : nouvel essai à la prochaine minute.
+    }
+  }
+
+  function showUpdated() {
+    let el = document.getElementById('map-updated');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'map-updated';
+      el.className = 'map-updated';
+      document.getElementById('main-map').appendChild(el);
+    }
+    el.textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR',
+      { hour: '2-digit', minute: '2-digit' }) + ' · actualisation chaque minute';
   }
 
   // Masque les pays voisins. Le fond de carte (OpenStreetMap ou satellite) est
@@ -121,6 +158,7 @@ const MapView = (() => {
     try {
       allPoints = await API.mapPoints() || [];
       setLoadingBanner('');
+      showUpdated();
     } catch (e) {
       allPoints = [];
       setLoadingBanner(`<b>Données indisponibles</b><small>${escapeHtml(e.message)}</small>`
@@ -233,11 +271,75 @@ const MapView = (() => {
 
   // ── Rendu ───────────────────────────────────────────────────────────────────
 
+  // ── IMP-10 : couches « débit » et « 5G » ────────────────────────────────
+
+  // Paliers de débit descendant de la carte de débit (Mb/s).
+  const SPEED_CLASSES = [
+    { max: 3, color: '#d7191c', label: '< 3 Mb/s' },
+    { max: 8, color: '#fdae61', label: '3 – 8' },
+    { max: 30, color: '#a6d96a', label: '8 – 30' },
+    { max: 100, color: '#1a9641', label: '30 – 100' },
+    { max: Infinity, color: '#0b5d2c', label: '> 100 Mb/s' },
+  ];
+
+  const speedClass = (dl) => SPEED_CLASSES.find((c) => dl < c.max) || SPEED_CLASSES[0];
+
+  const is5G = (p) => [p.cellularTech, p.networkType]
+    .some((t) => (t || '').toUpperCase() === '5G');
+
+  function renderLegend(points) {
+    const box = document.getElementById('layer-legend');
+    if (state.layer === 'zones') { box.style.display = 'none'; return; }
+    const items = SPEED_CLASSES.map((c) =>
+      `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('');
+    box.innerHTML = items + (state.layer === '5g'
+      ? `<span><b>${points.length}</b>&nbsp;mesure${points.length > 1 ? 's' : ''} 5G</span>` : '');
+    box.style.display = '';
+  }
+
+  // Chaque mesure est un point coloré selon son débit descendant.
+  function renderSpeedLayer(points) {
+    points.filter((p) => p.lat && p.lng).forEach((p) => {
+      const c = speedClass(p.download || 0);
+      // Points plus petits en vue large : à l'échelle du pays, des centaines
+      // de mesures se superposeraient en une seule tache.
+      const zoom = map.getZoom();
+      const m = L.circleMarker([p.lat, p.lng], {
+        radius: zoom >= 13 ? 6 : zoom >= 10 ? 4 : 3,
+        weight: zoom >= 13 ? 1 : 0.5, color: '#ffffff', fillColor: c.color, fillOpacity: 0.9,
+      });
+      const score = YeleScore.of(p);
+      m.bindPopup(`
+        <div class="popup-yele">
+          <div class="popup-op"><b>${escapeHtml(p.operator || 'Inconnu')}</b>
+            <span class="popup-net" style="background:${networkColor(p.cellularTech || p.networkType)}">${escapeHtml(p.cellularTech || p.networkType || '–')}</span></div>
+          <div class="popup-metrics">
+            <div class="popup-metric"><b>${(p.download || 0).toFixed(1)}</b><span>Mbps ↓</span></div>
+            <div class="popup-metric"><b>${(p.upload || 0).toFixed(1)}</b><span>Mbps ↑</span></div>
+            <div class="popup-metric"><b>${Math.round(p.ping || 0)}</b><span>ms</span></div>
+          </div>
+          <div class="popup-quality">Score ${Math.round(score)}/100 — ${YeleScore.band(score).label}</div>
+          <small>${escapeHtml(p.location || '')} · ${escapeHtml(p.timestamp || '')}</small>
+        </div>`);
+      markersLayer.addLayer(m);
+    });
+  }
+
   function render() {
     markersLayer.clearLayers();
     if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
 
-    const points = filteredPoints();
+    let points = filteredPoints();
+    if (state.layer === '5g') points = points.filter(is5G);
+    renderLegend(points);
+
+    if (state.layer !== 'zones' && state.mode !== 'heatmap') {
+      if (state.layer === '5g' && !points.length) {
+        App.toast('Aucune mesure 5G pour ces filtres.');
+      }
+      renderSpeedLayer(points);
+      return;
+    }
 
     if (state.mode === 'heatmap') {
       const usage = USAGES[state.usage];
@@ -398,6 +500,7 @@ const MapView = (() => {
           <div class="popup-metric"><b>${zone.avgUl.toFixed(1)}</b><span>Mbps ↑ moy.</span></div>
           <div class="popup-metric"><b>${Math.round(zone.avgPing)}</b><span>ms moy.</span></div>
         </div>
+        <div class="popup-quality">Score global moyen : ${Math.round(zone.points.reduce((s, p) => s + YeleScore.of(p), 0) / zone.count)}/100</div>
         <div class="zbd-title">Débit ↓ moyen par ${grainNames[bd.grain]}</div>
         <div class="zbd">${breakdownRows || '<div class="zbd-empty">Données horodatées indisponibles.</div>'}</div>
       </div>`;
@@ -435,6 +538,16 @@ const MapView = (() => {
       });
     });
 
+    // Couche : zones / débit / 5G (IMP-10)
+    document.querySelectorAll('#layer-mode .toggle').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#layer-mode .toggle').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.layer = btn.dataset.layer;
+        render();
+      });
+    });
+
     // Fond de plan
     document.querySelectorAll('#basemap-mode .toggle').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -462,8 +575,21 @@ const MapView = (() => {
     document.getElementById('locate-btn').addEventListener('click', () => {
       if (!navigator.geolocation) return App.toast('Géolocalisation non disponible');
       navigator.geolocation.getCurrentPosition(
-        (pos) => flyTo(pos.coords.latitude, pos.coords.longitude, 13),
-        () => App.toast('Position introuvable — vérifiez les autorisations')
+        (pos) => {
+          const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+          // ISS-11 : marqueur à la position, avec le cercle de précision.
+          meLayer.clearLayers();
+          L.circle([lat, lng], { radius: accuracy, color: '#2563eb', weight: 1, fillOpacity: 0.08 })
+            .addTo(meLayer);
+          L.marker([lat, lng], {
+            icon: L.divIcon({ className: '', html: '<div class="yele-me"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+            zIndexOffset: 1000,
+          }).bindPopup(`Vous êtes ici<br><small>précision ± ${Math.round(accuracy)} m</small>`)
+            .addTo(meLayer);
+          flyTo(lat, lng, 15);
+        },
+        () => App.toast('Position introuvable — vérifiez les autorisations'),
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     });
   }

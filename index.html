@@ -102,6 +102,13 @@
           <button class="toggle active" data-mode="points">Points de test</button>
           <button class="toggle" data-mode="heatmap">Carte de chaleur</button>
         </div>
+        <!-- IMP-10 : couches « débit » et « 5G » -->
+        <div class="toggle-group" id="layer-mode">
+          <button class="toggle active" data-layer="zones">Zones</button>
+          <button class="toggle" data-layer="debit">Carte de débit</button>
+          <button class="toggle" data-layer="5g">Carte 5G</button>
+        </div>
+        <div class="layer-legend" id="layer-legend" style="display:none"></div>
         <div class="toggle-group" id="basemap-mode">
           <button class="toggle active" data-base="plan">Plan</button>
           <button class="toggle" data-base="satellite">Satellite</button>
@@ -226,11 +233,15 @@
       <label>Au <input type="date" id="hf-to"></label>
       <button class="btn-primary" id="hf-apply">Filtrer</button>
       <button class="btn-ghost" id="hf-reset">Réinitialiser</button>
+      <!-- IMP-11 : export des mesures filtrées -->
+      <button class="btn-ghost" id="hf-export-csv">Exporter CSV</button>
+      <button class="btn-ghost" id="hf-export-json">Exporter JSON</button>
     </div>
+    <p class="history-updated" id="hf-updated"></p>
     <div class="table-wrap">
       <table class="data-table" id="history-table">
         <thead><tr>
-          <th>Date</th><th>FAI</th><th>Réseau mobile</th><th>Réseau</th><th>↓ Mbps</th><th>↑ Mbps</th><th>Ping</th><th>Jitter</th><th>Streaming</th><th>Nav. web</th><th>Lieu</th><th>Appareil</th><th>Qualité</th>
+          <th>Date</th><th>FAI</th><th>Réseau mobile</th><th>Réseau</th><th>↓ Mbps</th><th>↑ Mbps</th><th>Ping</th><th>Jitter</th><th>Streaming</th><th>Nav. web</th><th>Lieu</th><th>Appareil</th><th>Score</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -296,6 +307,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="config.js"></script>
 <script src="js/quality.js"></script>
+<script src="js/score.js"></script>
 <script src="js/api.js"></script>
 <script src="js/burkina.js"></script>
 <script src="js/map.js"></script>
