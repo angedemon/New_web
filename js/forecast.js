@@ -49,7 +49,7 @@ const Forecast = (() => {
   const HEAT_C = 40;
   const HEAT_FACTOR = 0.95;
 
-  const state = { operator: '', tech: '', hour: 0, inited: false };
+  const state = { operator: '', tech: '', source: '', hour: 0, inited: false };
   let map = null;
   let layer = null;
   let samples = [];     // mesures mobiles de Ouaga, normalisées
@@ -59,17 +59,6 @@ const Forecast = (() => {
   // ── Données ────────────────────────────────────────────────────────────────
 
   const MOBILE_TECH = /^(2G|3G|4G|5G|MOBILE)$/i;
-
-  function mobileOperator(p) {
-    const pick = (s) => {
-      s = (s || '').toLowerCase();
-      if (/orange|61302/.test(s)) return 'Orange';
-      if (/telecel|61303/.test(s)) return 'Telecel';
-      if (/moov|onatel|telmob|61301/.test(s)) return 'Moov Africa';
-      return null;
-    };
-    return pick(p.simOperator) || pick(p.operator);
-  }
 
   function techOf(p) {
     const t = (p.cellularTech || p.networkType || '').toUpperCase();
@@ -101,14 +90,15 @@ const Forecast = (() => {
   }
 
   async function loadSamples() {
-    const points = await API.mapPoints({ fresh: false });
+    const [points, terrain] = await Promise.all([API.mapPoints({ fresh: false }), Terrain.load()]);
     const mobile = points
       .filter((p) => p.lat && p.lng && inOuaga(p) && MOBILE_TECH.test(p.networkType || '') && p.download > 0)
       .map((p) => {
         const d = parseTs(p.timestamp);
         return {
           lat: p.lat, lng: p.lng,
-          operator: mobileOperator(p),
+          source: 'yele',
+          operator: Terrain.mobileOperator(p),
           tech: techOf(p),
           download: p.download,
           upload: p.upload > 0 ? p.upload : null,
@@ -116,6 +106,13 @@ const Forecast = (() => {
           hour: isNaN(d) ? 12 : d.getHours(),
         };
       });
+    // Tests nPerf de la campagne des agents : même format, source distincte.
+    if (terrain.nperf) {
+      terrain.nperf.tests.filter((t) => inOuaga(t)).forEach((t) => mobile.push({
+        source: 'nperf', lat: t.lat, lng: t.lng, operator: t.op, tech: t.tech,
+        download: t.dl, upload: t.ul, ping: t.ping, hour: +t.t.slice(11, 13),
+      }));
+    }
     loadByHour = buildLoadProfile(mobile);
     // Valeurs « heure neutre » : on retire l'effet de charge de l'heure du test.
     mobile.forEach((s) => {
@@ -178,6 +175,7 @@ const Forecast = (() => {
 
   function filtered() {
     return samples.filter((s) =>
+      (!state.source || s.source === state.source) &&
       (!state.operator || s.operator === state.operator) &&
       (!state.tech || s.tech === state.tech));
   }
@@ -193,12 +191,13 @@ const Forecast = (() => {
   // mesures voisines, en valeurs « heure neutre ».
   function capacityAt(pos, pool) {
     let w = 0; let lDl = 0; let wUl = 0; let lUl = 0; let wPing = 0; let sPing = 0;
-    let n = 0; let nNear = 0; let nearest = Infinity;
+    let n = 0; let nNear = 0; let nearest = Infinity; let nNperf = 0;
     pool.forEach((s) => {
       const d = distM(pos, s);
       if (d > NEIGHBOR_MAX_M) return;
       const k = Math.exp(-(d * d) / (2 * NEIGHBOR_SIGMA_M * NEIGHBOR_SIGMA_M));
       n += 1; if (d <= 300) nNear += 1; nearest = Math.min(nearest, d);
+      if (s.source === 'nperf') nNperf += 1;
       w += k; lDl += k * Math.log(s.dlN);
       if (s.ulN) { wUl += k; lUl += k * Math.log(s.ulN); }
       if (s.pingN) { wPing += k; sPing += k * s.pingN; }
@@ -208,7 +207,7 @@ const Forecast = (() => {
       dl: Math.exp(lDl / w),
       ul: wUl ? Math.exp(lUl / wUl) : null,
       ping: wPing ? sPing / wPing : null,
-      n, nNear, nearest,
+      n, nNear, nearest, nNperf,
       confidence: nNear >= 5 ? 'Élevée' : nNear >= 2 || n >= 5 ? 'Moyenne' : 'Faible',
     };
   }
@@ -287,6 +286,7 @@ const Forecast = (() => {
         <tr><td>Charge (${loadLabel(p.load)})</td><td>× ${fmt(p.load, 2)}</td></tr>
         <tr><td>Météo (${weatherText(met)})</td><td>× ${fmt(met.factor, 2)}</td></tr>
         <tr><td>Fiabilité</td><td>${cap.confidence} · ${cap.n} mesure${cap.n > 1 ? 's' : ''}</td></tr>
+        <tr><td>dont Yélé / nPerf</td><td>${cap.n - cap.nNperf} / ${cap.nNperf}</td></tr>
       </table>
       ${warn.map((w) => `<div class="fc-warn">${w}</div>`).join('')}
     </div>`;
@@ -336,7 +336,7 @@ const Forecast = (() => {
   function buildChips(boxId, values, key) {
     const box = document.getElementById(boxId);
     box.innerHTML = '';
-    [['', 'Tous']].concat(values.map((v) => [v, v])).forEach(([val, label]) => {
+    [['', 'Tous']].concat(values.map((v) => (Array.isArray(v) ? v : [v, v]))).forEach(([val, label]) => {
       const b = document.createElement('button');
       b.className = 'chip' + (state[key] === val ? ' active' : '');
       b.textContent = label;
@@ -379,7 +379,9 @@ const Forecast = (() => {
         slider.max = weather.times.length - 1;
         buildChips('fc-operators', ['Orange', 'Moov Africa', 'Telecel'], 'operator');
         buildChips('fc-techs', ['4G', '3G', '2G'], 'tech');
-        document.getElementById('fc-samples').textContent = samples.length;
+        buildChips('fc-sources', [['yele', 'Yélé'], ['nperf', 'nPerf']], 'source');
+        document.getElementById('fc-samples').textContent = samples.filter((x) => x.source === 'yele').length;
+        document.getElementById('fc-samples-nperf').textContent = samples.filter((x) => x.source === 'nperf').length;
         loading.style.display = 'none';
         render();
       } catch (e) {

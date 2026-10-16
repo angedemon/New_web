@@ -10,7 +10,10 @@ const App = (() => {
       v.classList.toggle('active', v.id === 'view-' + name));
 
     if (name === 'map') MapView.invalidate();
-    if (name === 'operators') Operators.show();
+    if (name === 'operators') {
+      Operators.show();
+      API.mapPoints().then(Terrain.renderComparison).catch(() => {});
+    }
     if (name === 'stats') Stats.show();
     if (name === 'history') History.show();
     if (name === 'forecast') Forecast.show();
