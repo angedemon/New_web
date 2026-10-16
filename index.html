@@ -27,6 +27,7 @@
     <button class="topnav-item" data-view="operators">Opérateurs</button>
     <button class="topnav-item" data-view="stats">Statistiques</button>
     <button class="topnav-item" data-view="history">Historique des tests</button>
+    <button class="topnav-item" data-view="forecast">Prévision</button>
     <button class="topnav-item" data-view="ai">Analyse IA</button>
   </nav>
 
@@ -254,6 +255,51 @@
   </div>
 </section>
 
+<!-- ─── Vue Prévision (Ouagadougou) ─────────────────────────────────────────── -->
+<section class="view view-forecast" id="view-forecast">
+  <div id="forecast-map"></div>
+  <div class="map-loading" id="fc-loading" style="display:none">Chargement des mesures et de la météo…</div>
+
+  <aside class="control-panel fc-panel">
+    <div class="panel-content">
+      <div class="panel-block">
+        <div class="panel-label">Prévision · Ouagadougou</div>
+        <div class="fc-time" id="fc-time">—</div>
+        <input type="range" id="fc-hour" min="0" max="47" value="0" step="1" aria-label="Heure de la prévision">
+        <div class="fc-range-ends"><span>Maintenant</span><span>+48 h</span></div>
+        <div class="fc-weather" id="fc-weather"></div>
+      </div>
+      <div class="panel-block">
+        <div class="panel-label">Opérateur</div>
+        <div class="operator-chips" id="fc-operators"></div>
+      </div>
+      <div class="panel-block">
+        <div class="panel-label">Technologie</div>
+        <div class="tech-chips" id="fc-techs"></div>
+      </div>
+      <div class="panel-block">
+        <div class="panel-label">Débit descendant attendu</div>
+        <div class="fc-legend">
+          <span><i style="background:#d7191c"></i>&lt; 3 Mb/s</span>
+          <span><i style="background:#fdae61"></i>3 – 8</span>
+          <span><i style="background:#a6d96a"></i>8 – 30</span>
+          <span><i style="background:#1a9641"></i>30 – 100</span>
+          <span><i style="background:#0b5d2c"></i>&gt; 100 Mb/s</span>
+        </div>
+        <div class="fc-count" id="fc-count"></div>
+      </div>
+      <details class="fc-method">
+        <summary>Comment est calculée la prévision ?</summary>
+        <p>Débit prévu = capacité du lieu × charge de l'heure × météo.</p>
+        <p><b>Capacité</b> : les <span id="fc-samples">0</span> tests mobiles Yélé faits à Ouagadougou, pondérés par la distance (rayon 1,2 km).</p>
+        <p><b>Charge</b> : plus il y a d'utilisateurs connectés, plus le débit de chacun baisse. Pointes vers midi et entre 18 h et 22 h, corrigées par les mesures.</p>
+        <p><b>Météo</b> (Open-Meteo) : la pluie ne gêne pas les fréquences mobiles, mais une forte averse dégrade les faisceaux hertziens qui relient les antennes. Les orages font craindre des coupures de sites, la chaleur au-delà de 40 °C une surchauffe.</p>
+        <p>Cercle plein : beaucoup de mesures proches. Cercle en pointillés : prévision peu fiable. Cliquez n'importe où sur la carte pour une prévision à cet endroit.</p>
+      </details>
+    </div>
+  </aside>
+</section>
+
 <!-- ─── Vue Analyse IA ──────────────────────────────────────────────────────── -->
 <section class="view view-ai" id="view-ai">
   <div class="page-head">
@@ -314,6 +360,7 @@
 <script src="js/operators.js"></script>
 <script src="js/stats.js"></script>
 <script src="js/history.js"></script>
+<script src="js/forecast.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/app.js"></script>
 </body>
