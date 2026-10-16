@@ -13,6 +13,7 @@ const App = (() => {
     if (name === 'operators') Operators.show();
     if (name === 'stats') Stats.show();
     if (name === 'history') History.show();
+    if (name === 'forecast') Forecast.show();
     if (name === 'ai') AIView.show();
   }
 
