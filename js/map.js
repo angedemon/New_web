@@ -78,6 +78,9 @@ const MapView = (() => {
     // Le regroupement dépend du zoom : il faut le recalculer à chaque niveau.
     map.on('zoomend', render);
 
+    // Relevés de terrain importés (nPerf, TowerCollector) : couches à cocher.
+    Terrain.attachToMainMap(map);
+
     bindControls();
     loadData();
 

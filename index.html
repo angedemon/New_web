@@ -116,6 +116,16 @@
         </div>
       </div>
     </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Relevés de terrain</div>
+      <div class="terrain-layers" id="terrain-layers">
+        <label><input type="checkbox" data-terrain="nperf"> Tests nPerf des agents <small>…</small></label>
+        <label><input type="checkbox" data-terrain="couverture"> Couverture 4G Orange <small>…</small></label>
+        <label><input type="checkbox" data-terrain="sites"> Sites Orange estimés <small>…</small></label>
+      </div>
+      <div class="layer-legend terrain-legend" id="terrain-legend" style="display:none"></div>
+    </div>
     </div><!-- /.panel-content -->
   </aside>
 
@@ -136,6 +146,24 @@
     <div class="kpi-card"><div class="kpi-value" id="op-kpi-rows">–</div><div class="kpi-label">Lignes comparées</div></div>
     <div class="kpi-card"><div class="kpi-value" id="op-kpi-tests">–</div><div class="kpi-label">Tests agrégés</div></div>
     <div class="kpi-card"><div class="kpi-value" id="op-kpi-best">–</div><div class="kpi-label">Meilleur débit ↓ moyen</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Yélé face à nPerf, par opérateur (mobile, Ouagadougou)</h2></div>
+    <div class="table-wrap">
+      <table class="data-table" id="terrain-compare">
+        <thead><tr>
+          <th>Opérateur</th>
+          <th>Tests Yélé / nPerf</th>
+          <th>↓ Mbps médian</th>
+          <th>↑ Mbps médian</th>
+          <th>Latence médiane (ms)</th>
+          <th>Conformes ARCEP 4G</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="terrain-note" id="terrain-compare-note"></p>
   </div>
 
   <div class="card">
@@ -278,6 +306,10 @@
         <div class="tech-chips" id="fc-techs"></div>
       </div>
       <div class="panel-block">
+        <div class="panel-label">Source des mesures</div>
+        <div class="tech-chips" id="fc-sources"></div>
+      </div>
+      <div class="panel-block">
         <div class="panel-label">Débit descendant attendu</div>
         <div class="fc-legend">
           <span><i style="background:#d7191c"></i>&lt; 3 Mb/s</span>
@@ -291,7 +323,7 @@
       <details class="fc-method">
         <summary>Comment est calculée la prévision ?</summary>
         <p>Débit prévu = capacité du lieu × charge de l'heure × météo.</p>
-        <p><b>Capacité</b> : les <span id="fc-samples">0</span> tests mobiles Yélé faits à Ouagadougou, pondérés par la distance (rayon 1,2 km).</p>
+        <p><b>Capacité</b> : les <span id="fc-samples">0</span> tests mobiles Yélé et les <span id="fc-samples-nperf">0</span> tests nPerf des agents faits à Ouagadougou, pondérés par la distance (rayon 1,2 km).</p>
         <p><b>Charge</b> : plus il y a d'utilisateurs connectés, plus le débit de chacun baisse. Pointes vers midi et entre 18 h et 22 h, corrigées par les mesures.</p>
         <p><b>Météo</b> (Open-Meteo) : la pluie ne gêne pas les fréquences mobiles, mais une forte averse dégrade les faisceaux hertziens qui relient les antennes. Les orages font craindre des coupures de sites, la chaleur au-delà de 40 °C une surchauffe.</p>
         <p>Cercle plein : beaucoup de mesures proches. Cercle en pointillés : prévision peu fiable. Cliquez n'importe où sur la carte pour une prévision à cet endroit.</p>
@@ -356,6 +388,7 @@
 <script src="js/score.js"></script>
 <script src="js/api.js"></script>
 <script src="js/burkina.js"></script>
+<script src="js/terrain.js"></script>
 <script src="js/map.js"></script>
 <script src="js/operators.js"></script>
 <script src="js/stats.js"></script>

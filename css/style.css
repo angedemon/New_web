@@ -494,3 +494,17 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 @media (max-width: 700px) {
   .fc-panel { width: auto; right: 16px; max-height: 45%; }
 }
+
+/* ─── Relevés de terrain (nPerf, TowerCollector) ────────────────────────────── */
+.terrain-layers { display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.terrain-layers label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.terrain-layers input { accent-color: var(--green); }
+.terrain-layers small { margin-left: auto; font-weight: 500; color: var(--text-soft); }
+.terrain-legend i { border: 0; }
+.terrain-badge { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 10.5px; font-weight: 700; }
+.terrain-lines { margin: 6px 0; font-size: 12px; line-height: 1.5; color: var(--text); }
+.terrain-site-icon { background: none; border: 0; }
+.terrain-gap { margin-left: 4px; font-size: 11px; font-weight: 700; }
+.terrain-gap.ok { color: var(--green); }
+.terrain-gap.ko { color: #b42318; }
+.terrain-note { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--text-soft); }
