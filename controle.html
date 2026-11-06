@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Espace réservé : pas d'indexation par les moteurs de recherche. -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>Yélé Contrôle</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/controle.css">
+</head>
+<body>
+
+<header class="ct-top">
+  <div class="ct-brand">
+    <img src="assets/yele-logo.png" alt="Yélé" width="44" height="44">
+    <div>
+      <b>Yélé <span>Contrôle</span></b>
+      <small>Espace réservé à l'autorité · drive test et walk test</small>
+    </div>
+  </div>
+  <div class="ct-user" id="ct-user"></div>
+</header>
+
+<main class="ct-main">
+
+  <!-- Connexion -->
+  <section class="ct-login" id="view-login">
+    <div class="ct-card">
+      <h1>Accès réservé</h1>
+      <p>Les mesures de contrôle sont séparées des mesures citoyennes. Connectez-vous avec un compte d'agent
+        ou de la direction déclaré par l'administrateur.</p>
+      <form id="login-form" novalidate>
+        <label for="login-email">E-mail</label>
+        <input id="login-email" type="email" autocomplete="username" required>
+        <label for="login-password">Mot de passe</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <div class="ct-error" id="login-error" hidden></div>
+        <button class="ct-btn primary" type="submit" id="login-submit">Se connecter</button>
+      </form>
+      <div class="ct-sep"><span>ou</span></div>
+      <button class="ct-btn" id="demo-btn">Voir la démonstration</button>
+      <p class="ct-hint">La démonstration charge une tournée simulée de 40,8 km dans Ouagadougou (trois téléphones,
+        77 cycles). Ce ne sont pas des mesures réelles.</p>
+    </div>
+  </section>
+
+  <!-- Campagnes -->
+  <section class="ct-app" id="view-app" hidden>
+    <div class="ct-banner" id="demo-banner" hidden>
+      Démonstration : tournée simulée, valeurs générées. Ce ne sont pas des mesures réelles.
+    </div>
+
+    <div class="ct-head">
+      <div>
+        <label class="ct-eyebrow" for="campaign-select">Campagne</label>
+        <select id="campaign-select"></select>
+      </div>
+      <div class="ct-head-meta" id="campaign-meta"></div>
+      <div class="ct-head-actions">
+        <span class="ct-live" id="live-badge" hidden>En cours · actualisation toutes les 30 s</span>
+        <button class="ct-btn" id="refresh-btn">Actualiser</button>
+        <button class="ct-btn" id="export-btn">Exporter en CSV</button>
+      </div>
+    </div>
+
+    <div class="ct-summary" id="summary"></div>
+
+    <div class="ct-grid">
+      <div class="ct-card ct-mapcard">
+        <div class="ct-map-tools">
+          <div class="ct-seg" id="op-filter" role="group" aria-label="Opérateur"></div>
+          <div class="ct-seg" id="layer-filter" role="group" aria-label="Indicateur">
+            <button data-layer="dl" aria-pressed="true">Débit ↓</button>
+            <button data-layer="rsrp" aria-pressed="false">Signal RSRP</button>
+            <button data-layer="ping" aria-pressed="false">Latence</button>
+          </div>
+        </div>
+        <div id="ct-map"></div>
+        <div class="ct-legend" id="legend"></div>
+      </div>
+      <div class="ct-side">
+        <div class="ct-card">
+          <h2>Téléphones</h2>
+          <div id="devices"></div>
+        </div>
+        <div class="ct-card">
+          <h2>Journal scellé</h2>
+          <div id="seal"></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="ct-section">Conformité par opérateur</h2>
+    <p class="ct-section-sub">Mêmes lieux, mêmes heures, mêmes téléphones. Seuils de l'annexe 3 des cahiers des charges des licences.</p>
+    <div class="ct-ops" id="ops"></div>
+
+    <div class="ct-grid2">
+      <div class="ct-card">
+        <h2>Points noirs</h2>
+        <p class="ct-muted">Cycles en échec ou signal sous −110 dBm, du plus grave au moins grave.</p>
+        <div class="ct-tablewrap"><table>
+          <thead><tr><th>Opérateur</th><th>Heure</th><th>Constat</th><th>Coordonnées</th></tr></thead>
+          <tbody id="spots"></tbody>
+        </table></div>
+      </div>
+      <div class="ct-card">
+        <h2>Dernières mesures</h2>
+        <div class="ct-tablewrap"><table>
+          <thead><tr><th>Heure</th><th>Opérateur</th><th>Techno</th><th>▼ Mb/s</th><th>▲ Mb/s</th><th>Latence</th><th>RSRP</th></tr></thead>
+          <tbody id="latest"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="js/controle.js"></script>
+</body>
+</html>
