@@ -32,6 +32,18 @@ const Controle = (() => {
   const median = (a) => { const s = a.filter((x) => x != null && isFinite(x)).sort((x, y) => x - y); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
   const pct = (n, d) => (d ? (100 * n) / d : null);
   const opOf = (p, doc) => OPS.find((o) => o.re.test(p.simOperator || '') || o.re.test(doc.operator || '')) || null;
+  // Cycle non retenu : il n'a pas mesuré l'opérateur mobile (test en Wi-Fi,
+  // pas de réseau mobile). Il n'entre dans aucun taux ni sur la carte.
+  const excludedOf = (p) => {
+    if (p.excluded) return p.excluded;
+    if (!p.connection || p.connection === 'Mobile') return null;
+    return p.connection === 'WiFi' ? 'wifi' : 'hors réseau mobile';
+  };
+  const EXCLUDED_LABEL = { wifi: 'Wi-Fi : non retenu', 'hors réseau mobile': 'Pas de réseau mobile : non retenu' };
+  // Verdict web / vidéo : celui du téléphone s'il est fourni, sinon le seuil.
+  const webOk = (p) => (p.webOk != null ? p.webOk : p.webLoadS != null && p.webLoadS < ARCEP.webMax);
+  const videoOk = (p) => (p.videoOk != null ? p.videoOk : p.videoStartS != null && p.videoStartS < ARCEP.videoMax);
+  const usable = () => state.rows.filter((r) => !r.excluded);
 
   function store(key, value) {
     try { if (value == null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, value); } catch (_) { /* stockage indisponible */ }
@@ -122,7 +134,7 @@ const Controle = (() => {
     state.rows = data.measurements.map((doc) => {
       let p = {};
       try { p = JSON.parse(doc.payload); } catch (_) { /* mesure illisible */ }
-      return { doc, p, op: opOf(p, doc) };
+      return { doc, p, op: opOf(p, doc), excluded: excludedOf(p) };
     });
     renderAll();
     scheduleRefresh();
@@ -154,12 +166,13 @@ const Controle = (() => {
     const s = state.campaign.summary || {};
     const rows = state.rows;
     $('campaign-meta').textContent = `${dayFr(s.firstAt)} · ${hhmm(s.firstAt)} – ${hhmm(s.lastAt)} · ${(s.agents || []).join(', ')}`;
-    const failed = rows.filter((r) => r.p.error).length;
+    const failed = rows.filter((r) => !r.excluded && r.p.error).length;
+    const excluded = rows.filter((r) => r.excluded).length;
     $('summary').innerHTML = [
-      ['Mesures', rows.length, ''],
+      ['Mesures retenues', rows.length - excluded, ''],
+      ['Non retenues (Wi-Fi)', excluded, excluded ? 'ko' : ''],
       ['Cycles en échec', failed, failed ? 'ko' : 'ok'],
       ['Téléphones', (s.devices || []).length, ''],
-      ['Opérateurs', OPS.filter((o) => rows.some((r) => r.op === o)).length, ''],
       ['Durée', s.firstAt ? `${Math.round((new Date(s.lastAt) - new Date(s.firstAt)) / 60000)} min` : '—', ''],
     ].map(([k, v, c]) => `<div class="ct-stat"><small>${k}</small><b class="${c}">${v}</b></div>`).join('');
     renderOpFilter();
@@ -213,7 +226,7 @@ const Controle = (() => {
     layer.clearLayers();
     const sc = SCALES[state.layer];
     const pts = [];
-    for (const r of state.rows) {
+    for (const r of usable()) {
       if (state.op && (!r.op || r.op.id !== state.op)) continue;
       const lat = r.p.latitude, lng = r.p.longitude;
       if (!lat || !lng) continue;
@@ -263,22 +276,27 @@ const Controle = (() => {
 
   function renderOps() {
     $('ops').innerHTML = OPS.map((op) => {
-      const rows = state.rows.filter((r) => r.op === op);
-      if (!rows.length) return '';
+      const rows = usable().filter((r) => r.op === op);
+      const skipped = state.rows.filter((r) => r.op === op && r.excluded).length;
+      if (!rows.length) {
+        return skipped ? `<div class="ct-card ct-op" style="--op:${op.color}">
+          <header><h2>${op.name}</h2><span class="ct-eyebrow">0 cycle retenu</span></header>
+          <p class="ct-muted">${skipped} cycle(s) faits en Wi-Fi, non retenus : coupez le Wi-Fi des téléphones de campagne.</p></div>` : '';
+      }
       const ok = rows.filter((r) => !r.p.error);
       const hasWeb = rows.some((r) => r.p.webLoadS != null);
       const hasVideo = rows.some((r) => r.p.videoStartS != null);
       const withRsrp = rows.filter((r) => r.p.rsrp != null);
       return `<div class="ct-card ct-op" style="--op:${op.color}">
-        <header><h2>${op.name}</h2><span class="ct-eyebrow">${rows.length} cycles</span></header>
+        <header><h2>${op.name}</h2><span class="ct-eyebrow">${rows.length} cycles${skipped ? ` · ${skipped} non retenus` : ''}</span></header>
         <div class="ct-kpis">
           <div><small>▼ médian</small><b>${fmt(median(ok.map((r) => r.p.download)))}</b></div>
           <div><small>▲ médian</small><b>${fmt(median(ok.map((r) => r.p.upload)))}</b></div>
           <div><small>Latence méd.</small><b>${ok.length ? fmt(median(ok.map((r) => r.p.ping)), 0) + ' ms' : '—'}</b></div>
         </div>
         ${check('Connexion data réussie (seuil 98 %)', pct(ok.length, rows.length), true, ARCEP.setupRate)}
-        ${check('Pages web en moins de 30 s (seuil 95 %)', hasWeb ? pct(ok.filter((r) => r.p.webLoadS < ARCEP.webMax).length, rows.length) : null, true, ARCEP.webRate)}
-        ${check('Vidéo : 1re image en moins de 5 s', hasVideo ? pct(ok.filter((r) => r.p.videoStartS < ARCEP.videoMax).length, rows.length) : null, false)}
+        ${check('Pages web en moins de 30 s (seuil 95 %)', hasWeb ? pct(ok.filter((r) => webOk(r.p)).length, rows.length) : null, true, ARCEP.webRate)}
+        ${check('Vidéo : 1re image en moins de 5 s', hasVideo ? pct(ok.filter((r) => videoOk(r.p)).length, rows.length) : null, false)}
         ${check('Couverture : RSRP ≥ −102 dBm', withRsrp.length ? pct(withRsrp.filter((r) => r.p.rsrp >= ARCEP.rsrpMin).length, withRsrp.length) : null, false)}
         ${check('Débit 4G : ▼ > 2 et ▲ > 1 Mb/s', pct(ok.filter((r) => r.p.download > ARCEP.dl4g && r.p.upload > ARCEP.ul4g).length, rows.length), false)}
       </div>`;
@@ -286,7 +304,7 @@ const Controle = (() => {
   }
 
   function renderSpots() {
-    const spots = state.rows.filter((r) => r.p.error || (r.p.rsrp != null && r.p.rsrp < -110))
+    const spots = usable().filter((r) => r.p.error || (r.p.rsrp != null && r.p.rsrp < -110))
       .sort((a, b) => (b.p.error ? 1 : 0) - (a.p.error ? 1 : 0) || (a.p.rsrp ?? 0) - (b.p.rsrp ?? 0));
     $('spots').innerHTML = spots.length ? spots.slice(0, 30).map((r) => `<tr>
       <td><span class="dot" style="background:${r.op ? r.op.color : '#9aa1b1'}"></span> ${esc(r.op ? r.op.name : '—')}</td>
@@ -299,8 +317,9 @@ const Controle = (() => {
   function renderLatest() {
     const rows = [...state.rows].sort((a, b) => (b.p.measuredAt || '').localeCompare(a.p.measuredAt || '')).slice(0, 40);
     $('latest').innerHTML = rows.map((r) => `<tr>
-      <td>${hhmm(r.p.measuredAt)}</td><td>${esc(r.op ? r.op.name : '—')}</td><td>${esc(r.p.cellularTech || '—')}</td>
-      ${r.p.error ? `<td class="ko" colspan="3">${esc(r.p.error)}</td>` : `<td>${fmt(r.p.download)}</td><td>${fmt(r.p.upload)}</td><td>${fmt(r.p.ping, 0)} ms</td>`}
+      <td>${hhmm(r.p.measuredAt)}</td><td>${esc(r.op ? r.op.name : '—')}</td><td>${esc(r.p.cellularTech || (r.excluded ? 'Wi-Fi' : '—'))}</td>
+      ${r.excluded ? `<td class="ko" colspan="3">${esc(EXCLUDED_LABEL[r.excluded] || 'non retenu')}</td>`
+        : r.p.error ? `<td class="ko" colspan="3">${esc(r.p.error)}</td>` : `<td>${fmt(r.p.download)}</td><td>${fmt(r.p.upload)}</td><td>${fmt(r.p.ping, 0)} ms</td>`}
       <td>${r.p.rsrp ?? '—'}</td></tr>`).join('');
   }
 
