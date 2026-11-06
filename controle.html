@@ -98,12 +98,21 @@
     <p class="ct-section-sub">Mêmes lieux, mêmes heures, mêmes téléphones. Seuils de l'annexe 3 des cahiers des charges des licences.</p>
     <div class="ct-ops" id="ops"></div>
 
+    <h2 class="ct-section">Conformité par commune</h2>
+    <p class="ct-section-sub">Chaque mesure est située dans sa commune d'après les limites administratives officielles.</p>
+    <div class="ct-card">
+      <div class="ct-tablewrap"><table>
+        <thead><tr><th>Commune</th><th>Province</th><th>Opérateur</th><th>Cycles</th><th>Connexion data</th><th>Pages web &lt; 30 s</th><th>▼ médian</th><th>RSRP médian</th></tr></thead>
+        <tbody id="communes"></tbody>
+      </table></div>
+    </div>
+
     <div class="ct-grid2">
       <div class="ct-card">
         <h2>Points noirs</h2>
         <p class="ct-muted">Cycles en échec ou signal sous −110 dBm, du plus grave au moins grave.</p>
         <div class="ct-tablewrap"><table>
-          <thead><tr><th>Opérateur</th><th>Heure</th><th>Constat</th><th>Coordonnées</th></tr></thead>
+          <thead><tr><th>Opérateur</th><th>Heure et commune</th><th>Constat</th><th>Coordonnées</th></tr></thead>
           <tbody id="spots"></tbody>
         </table></div>
       </div>
@@ -120,6 +129,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="config.js"></script>
+<script src="js/limites.js"></script>
 <script src="js/controle.js"></script>
 </body>
 </html>

@@ -138,6 +138,10 @@ const Controle = (() => {
     });
     renderAll();
     scheduleRefresh();
+    // Commune de chaque mesure (limites officielles), puis tableau par commune.
+    locateRows().then(() => { renderCommunes(); renderSpots(); }).catch(() => {
+      $('communes').innerHTML = '<tr><td colspan="8">Limites administratives indisponibles.</td></tr>';
+    });
   }
 
   function isLive() {
@@ -215,6 +219,7 @@ const Controle = (() => {
   function popup(r) {
     const p = r.p;
     return `<b>${esc(r.op ? r.op.name : p.simOperator || '—')}</b> · ${esc(p.cellularTech || '—')} · cycle ${esc(r.doc.seq)}<br>
+      ${r.commune ? `Commune de ${esc(r.commune.nom)} (${esc(r.commune.province)})<br>` : ''}
       ${hhmm(p.measuredAt)} · ${esc(r.doc.deviceId)}<br>
       ${p.error ? `<span style="color:#d23b33">Échec : ${esc(p.error)}</span><br>` : `▼ ${fmt(p.download)} · ▲ ${fmt(p.upload)} Mb/s · ${fmt(p.ping, 0)} ms<br>`}
       RSRP ${p.rsrp ?? '—'} dBm · perte ${fmt(p.packetLoss)} %<br>
@@ -288,7 +293,7 @@ const Controle = (() => {
       const hasVideo = rows.some((r) => r.p.videoStartS != null);
       const withRsrp = rows.filter((r) => r.p.rsrp != null);
       return `<div class="ct-card ct-op" style="--op:${op.color}">
-        <header><h2>${op.name}</h2><span class="ct-eyebrow">${rows.length} cycles${skipped ? ` · ${skipped} non retenus` : ''}</span></header>
+        <header><h2>${op.name}</h2><span class="ct-eyebrow">${rows.length} cycle${rows.length > 1 ? "s" : ""}${skipped ? ` · ${skipped} non retenus` : ''}</span></header>
         <div class="ct-kpis">
           <div><small>▼ médian</small><b>${fmt(median(ok.map((r) => r.p.download)))}</b></div>
           <div><small>▲ médian</small><b>${fmt(median(ok.map((r) => r.p.upload)))}</b></div>
@@ -303,12 +308,41 @@ const Controle = (() => {
     }).join('');
   }
 
+  async function locateRows() {
+    const locate = await Limites.locator();
+    for (const r of state.rows) r.commune = locate(r.p.latitude, r.p.longitude);
+  }
+
+  function renderCommunes() {
+    const groups = new Map();
+    for (const r of usable()) {
+      if (!r.commune || !r.op) continue;
+      const key = `${r.commune.nom}|${r.op.id}`;
+      if (!groups.has(key)) groups.set(key, { c: r.commune, op: r.op, rows: [] });
+      groups.get(key).rows.push(r);
+    }
+    const list = [...groups.values()].sort((a, b) => a.c.nom.localeCompare(b.c.nom) || a.op.name.localeCompare(b.op.name));
+    const cell = (v, threshold) => {
+      if (v == null) return '<td>—</td>';
+      return `<td class="${v >= threshold ? '' : 'ko'}">${fmt(v)} %</td>`;
+    };
+    $('communes').innerHTML = list.length ? list.map((g) => {
+      const ok = g.rows.filter((r) => !r.p.error);
+      const hasWeb = g.rows.some((r) => r.p.webLoadS != null);
+      return `<tr><td><b>${esc(g.c.nom)}</b></td><td>${esc(g.c.province)}</td>
+        <td><span class="dot" style="background:${g.op.color}"></span> ${g.op.name}</td><td>${g.rows.length}</td>
+        ${cell(pct(ok.length, g.rows.length), ARCEP.setupRate)}
+        ${cell(hasWeb ? pct(ok.filter((r) => webOk(r.p)).length, g.rows.length) : null, ARCEP.webRate)}
+        <td>${fmt(median(ok.map((r) => r.p.download)))}</td><td>${fmt(median(g.rows.map((r) => r.p.rsrp)), 0)}</td></tr>`;
+    }).join('') : '<tr><td colspan="8">Aucune mesure située dans une commune.</td></tr>';
+  }
+
   function renderSpots() {
     const spots = usable().filter((r) => r.p.error || (r.p.rsrp != null && r.p.rsrp < -110))
       .sort((a, b) => (b.p.error ? 1 : 0) - (a.p.error ? 1 : 0) || (a.p.rsrp ?? 0) - (b.p.rsrp ?? 0));
     $('spots').innerHTML = spots.length ? spots.slice(0, 30).map((r) => `<tr>
       <td><span class="dot" style="background:${r.op ? r.op.color : '#9aa1b1'}"></span> ${esc(r.op ? r.op.name : '—')}</td>
-      <td>${hhmm(r.p.measuredAt)}</td>
+      <td>${hhmm(r.p.measuredAt)}${r.commune ? ` · ${esc(r.commune.nom)}` : ''}</td>
       <td class="${r.p.error ? 'ko' : ''}">${r.p.error ? esc(r.p.error) : 'Signal faible'} · ${r.p.rsrp ?? '—'} dBm</td>
       <td>${fmt(r.p.latitude, 4)}, ${fmt(r.p.longitude, 4)}</td></tr>`).join('')
       : '<tr><td colspan="4">Aucun point noir sur cette campagne.</td></tr>';
@@ -353,10 +387,13 @@ const Controle = (() => {
 
   // Export : une ligne par mesure, les champs du téléphone et l'empreinte.
   function exportCsv() {
-    const cols = ['measuredAt', 'deviceId', 'seq', 'simOperator', 'cellularTech', 'latitude', 'longitude', 'rsrp', 'download', 'upload', 'ping', 'packetLoss', 'webLoadS', 'videoStartS', 'batteryTempC', 'error'];
+    const cols = ['measuredAt', 'deviceId', 'seq', 'commune', 'province', 'region', 'simOperator', 'cellularTech', 'latitude', 'longitude', 'rsrp', 'download', 'upload', 'ping', 'packetLoss', 'webLoadS', 'videoStartS', 'batteryTempC', 'error'];
     const q = (v) => { const s = v == null ? '' : String(v); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const lines = [cols.concat(['hash']).join(';')]
-      .concat(state.rows.map((r) => cols.map((c) => q(c === 'deviceId' ? r.doc.deviceId : c === 'seq' ? r.doc.seq : r.p[c])).concat(r.doc.hash).join(';')));
+      .concat(state.rows.map((r) => cols.map((c) => q(
+        c === 'deviceId' ? r.doc.deviceId : c === 'seq' ? r.doc.seq
+          : c === 'commune' ? r.commune?.nom : c === 'province' ? r.commune?.province : c === 'region' ? r.commune?.region
+            : r.p[c])).concat(r.doc.hash).join(';')));
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

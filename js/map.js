@@ -80,6 +80,9 @@ const MapView = (() => {
 
     // Relevés de terrain importés (nPerf, TowerCollector) : couches à cocher.
     Terrain.attachToMainMap(map);
+    // Limites officielles (régions, provinces, communes), colorées selon le
+    // débit médian des tests de chaque zone.
+    Limites.attachToMainMap(map, () => allPoints);
 
     bindControls();
     loadData();

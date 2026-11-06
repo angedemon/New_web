@@ -126,6 +126,17 @@
       </div>
       <div class="layer-legend terrain-legend" id="terrain-legend" style="display:none"></div>
     </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Limites administratives</div>
+      <div class="toggle-group" id="limits-mode">
+        <button class="toggle active" data-limits="">Aucune</button>
+        <button class="toggle" data-limits="regions">Régions</button>
+        <button class="toggle" data-limits="provinces">Provinces</button>
+        <button class="toggle" data-limits="communes">Communes</button>
+      </div>
+      <div class="layer-legend" id="limits-legend" style="display:none"></div>
+    </div>
     </div><!-- /.panel-content -->
   </aside>
 
@@ -388,6 +399,7 @@
 <script src="js/score.js"></script>
 <script src="js/api.js"></script>
 <script src="js/burkina.js"></script>
+<script src="js/limites.js"></script>
 <script src="js/terrain.js"></script>
 <script src="js/map.js"></script>
 <script src="js/operators.js"></script>
